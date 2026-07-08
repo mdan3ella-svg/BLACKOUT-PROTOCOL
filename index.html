@@ -534,7 +534,7 @@ renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x030507);
-const camera=new THREE.PerspectiveCamera(68,innerWidth/innerHeight,.1,2000);
+const camera=new THREE.PerspectiveCamera(68,innerWidth/innerHeight,.1,1000);
 camera.position.set(0,8,14);
 
 const pmrem=new THREE.PMREMGenerator(renderer);
@@ -544,6 +544,14 @@ scene.environmentIntensity=.72;
 /* ---------------- world containers ---------------- */
 const worldGroup=new THREE.Group(); scene.add(worldGroup);   // level geometry
 const fxGroup=new THREE.Group(); scene.add(fxGroup);         // beams, pulses
+
+/* ---- sensor-FX registry ----
+   Non-solid meshes (wireframes, detection cones, beacons, particles, beams)
+   must NOT be baked into SSAO/SSR depth-normal buffers as solid geometry —
+   that reads as grey halo lines smeared across the frame. They stay visible
+   in the beauty render; we hide them only during the passes' internal
+   override renders. */
+const sensorFX=new Set([fxGroup]);
 const colliders=[];          // {box:Box3, mesh?}   static AABBs
 const losMeshes=[];          // meshes used for line-of-sight raycasts
 const reflectiveMeshes=[];   // SSR selects
@@ -560,6 +568,10 @@ function clearWorld(){
   worldGroup.traverse(o=>{ if(o.geometry&&!o.userData.shared)o.geometry.dispose(); });
   worldGroup.clear(); fxGroup.clear();
   colliders.length=0; losMeshes.length=0; reflectiveMeshes.length=0;
+  for(const o of [...sensorFX]){ // drop refs whose root is no longer the scene
+    let r=o; while(r.parent)r=r.parent;
+    if(r!==scene)sensorFX.delete(o);
+  }
 }
 
 /* ---------------- LIDAR wireframe optic ----------------
@@ -580,14 +592,17 @@ function lidarify(root){
   for(const o of targets){
     o.userData.lidarDone=true;
     if(o.isInstancedMesh){
-      const w=new THREE.InstancedMesh(o.geometry,lidarMat,o.count);
+      // polygonOffset doesn't affect GL lines — inflate a geometry clone instead
+      const g2=o.geometry.clone(); g2.scale(1.006,1.006,1.006);
+      const w=new THREE.InstancedMesh(g2,lidarMat,o.count);
       w.instanceMatrix=o.instanceMatrix; // share the matrix attribute — static field, zero copy
-      w.userData.lidar=true; w.userData.shared=true; w.frustumCulled=false;
-      o.parent.add(w);
+      w.userData.lidar=true; w.frustumCulled=false; // unshared geo clone → disposed on level clear
+      o.parent.add(w); sensorFX.add(w);
     }else{
       const w=new THREE.Mesh(o.geometry,lidarMat);
+      w.scale.setScalar(1.0045); // lift lines off the surface — kills beauty-pass z-fighting
       w.userData.lidar=true; w.userData.shared=true;
-      o.add(w);
+      o.add(w); sensorFX.add(w);
     }
   }
 }
@@ -626,6 +641,7 @@ class ParticlePool{
     this.points=new THREE.Points(g,mat);
     this.points.frustumCulled=false;
     scene.add(this.points);
+    sensorFX.add(this.points);
   }
   spawn(p,v,color,life,size,grav=0){
     const i=this.cursor; this.cursor=(this.cursor+1)%this.count;
@@ -1215,12 +1231,12 @@ class Orb{
     this.coneMat=new THREE.MeshBasicMaterial({color:T.tint,transparent:true,opacity:.05,
       side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending,toneMapped:false});
     this.cone=new THREE.Mesh(cg,this.coneMat);
-    this.group.add(this.cone);
+    this.group.add(this.cone); sensorFX.add(this.cone);
     // shield bubble for wardens
     if(this.shielded){
       this.shieldMesh=new THREE.Mesh(new THREE.SphereGeometry(this.hitR*1.15/T.scale,20,14),
         new THREE.MeshBasicMaterial({color:0xff2d3a,transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false}));
-      this.group.add(this.shieldMesh);
+      this.group.add(this.shieldMesh); sensorFX.add(this.shieldMesh);
     }
     this.light=new THREE.PointLight(T.tint,4,14,2);
     this.group.add(this.light);
@@ -1441,7 +1457,7 @@ function floorPlane(size,mat,y=0,reflective=false){
   const wire=new THREE.Mesh(new THREE.PlaneGeometry(size,size,36,36),lidarMat);
   wire.rotation.x=-Math.PI/2; wire.position.y=y+.07;
   wire.userData.lidar=true; wire.userData.shared=true;
-  worldGroup.add(wire);
+  worldGroup.add(wire); sensorFX.add(wire);
   if(reflective)reflectiveMeshes.push(m);
   return m;
 }
@@ -1453,7 +1469,7 @@ function objectiveBeacon(p,color=0xff7a1a){
   const beam=new THREE.Mesh(new THREE.CylinderGeometry(.35,.7,60,12,1,true),
     new THREE.MeshBasicMaterial({color,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,side:THREE.DoubleSide}));
   beam.position.y=30; g.add(beam);
-  worldGroup.add(g);
+  worldGroup.add(g); sensorFX.add(g);
   g.userData.ring=ring;
   return g;
 }
@@ -1468,7 +1484,7 @@ function searchTower(x,z,h=26,sweep=1.1,speed=.4,phase=0){
   cg.translate(0,-range/2,0); cg.rotateX(-Math.PI/2);
   const cone=new THREE.Mesh(cg,new THREE.MeshBasicMaterial({color:0xfff2cf,transparent:true,opacity:.075,
     blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,toneMapped:false}));
-  head.add(cone);
+  head.add(cone); sensorFX.add(cone);
   const spot=new THREE.SpotLight(0xfff2cf,600,range,half*1.1,.5,1.4);
   head.add(spot); head.add(spot.target); spot.target.position.set(0,0,10);
   searchlights.push({head,range,half,sweep,speed,phase,tilt:.45}); // +X pitch aims local +Z beam downward
@@ -1501,7 +1517,7 @@ function tripwire(a,b,color=0xff2d3a){
     new THREE.MeshBasicMaterial({color,toneMapped:false}));
   m.position.copy(a).add(b).multiplyScalar(.5);
   m.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),tmpV.subVectors(b,a).normalize());
-  worldGroup.add(m);
+  worldGroup.add(m); sensorFX.add(m);
   tripwires.push({a:a.clone(),b:b.clone(),m,cool:0});
 }
 function segDist(p,a,b){
@@ -1551,7 +1567,7 @@ function hackCore(p,label){
   g.add(casing);
   const halo=new THREE.Mesh(new THREE.TorusGeometry(3.4,.1,10,48),
     new THREE.MeshBasicMaterial({color:0x4fd1c5,toneMapped:false,transparent:true,opacity:.8}));
-  g.add(halo);
+  g.add(halo); sensorFX.add(halo);
   worldGroup.add(g);
   hackZones.push({g,casing,halo,p:p.clone(),progress:0,done:false,label});
   return hackZones[hackZones.length-1];
@@ -1620,6 +1636,7 @@ function makeLights(hemiC=0x1a2b33,hemiG=0x05070a,hemiI=.7){
   const key=new THREE.DirectionalLight(0x8ab8c9,.5);
   key.position.set(40,80,20);
   if(Q.shadows){ key.castShadow=true; key.shadow.mapSize.set(2048,2048);
+    key.shadow.bias=-.0004; key.shadow.normalBias=.35; // acne guard — banding source in shadowed modes
     const sc=key.shadow.camera; sc.left=-120;sc.right=120;sc.top=120;sc.bottom=-120;sc.far=300; }
   worldGroup.add(key);
   return key;
@@ -1672,7 +1689,7 @@ const LEVELS=[
     rain=new ParticlePool(Math.floor(2600*Q.particles));
     for(let i=0;i<rain.count;i++)
       rain.spawn(new THREE.Vector3(rand(-160,160),rand(2,80),rand(-160,160)),
-        new THREE.Vector3(-2,-42,0),new THREE.Color(0x3a5560),9999,1.1,0);
+        new THREE.Vector3(-2,-42,0),new THREE.Color(0x4aa8b8),9999,1.0,0);
     this.exitBeacon=objectiveBeacon(new THREE.Vector3(0,2,-146),0xff7a1a);
     this.playerStart=new THREE.Vector3(0,8,140);
     this.spawnOrbs=[
@@ -1841,7 +1858,7 @@ const LEVELS=[
     const flWire=new THREE.Mesh(new THREE.PlaneGeometry(52,L,8,96),lidarMat);
     flWire.rotation.x=-Math.PI/2; flWire.position.set(0,.07,-L/2+20);
     flWire.userData.lidar=true; flWire.userData.shared=true;
-    worldGroup.add(flWire);
+    worldGroup.add(flWire); sensorFX.add(flWire);
     for(const side of [-1,1]){
       const w=new THREE.Mesh(new THREE.BoxGeometry(4,42,L),MAT.wall);
       w.position.set(side*28,21,-L/2+20); worldGroup.add(w); addCollider(w);
@@ -2008,18 +2025,55 @@ const GradeShader={
       gl_FragColor=vec4(col,1.);
     }`
 };
+/* FX that must never enter a depth/normal prepass: LIDAR wireframes,
+   detection cones, shield bubbles, beams, pulses, beacon shafts.
+   Rendered as solid geometry there, they z-fight their coplanar base
+   meshes and corrupt SSAO/SSR into exactly the grey-line artifacts. */
+function isDepthPassPollution(o){
+  if(sensorFX.has(o))return true; // explicit registry: tripwires, halos, beacons…
+  if(o.isPoints||o.isLine)return true;
+  if(!o.material)return false;
+  const ms=Array.isArray(o.material)?o.material:[o.material];
+  return ms.some(m=>m.wireframe||(m.transparent&&m.blending===THREE.AdditiveBlending));
+}
+const _ssrVisCache=new Map();
+function hideFxForPrepass(){
+  scene.traverse(o=>{ if(isDepthPassPollution(o)){ _ssrVisCache.set(o,o.visible); o.visible=false; } });
+}
+function restoreFxAfterPrepass(){
+  _ssrVisCache.forEach((v,o)=>o.visible=v); _ssrVisCache.clear();
+}
 function buildComposer(){
-  if(composer)composer.dispose();
+  if(composer){ composer.passes.forEach(p=>p.dispose&&p.dispose()); composer.dispose(); }
   composer=new EffectComposer(renderer);
   ssrPass=null; ssaoPass=null;
   if(Q.ssr){
     ssrPass=new SSRPass({renderer,scene,camera,width:innerWidth,height:innerHeight,
       selects:reflectiveMeshes,groundReflector:null});
-    ssrPass.maxDistance=60; ssrPass.thickness=.06; ssrPass.opacity=.55;
+    ssrPass.maxDistance=45; ssrPass.thickness=.3; ssrPass.opacity=.5; // thickness too small = stripe banding
+    // SSRPass has NO visibility handling — wrap its override-material prepasses
+    ssrPass.renderOverride=function(renderer,mat,rt,cc,ca){
+      hideFxForPrepass();
+      SSRPass.prototype.renderOverride.call(this,renderer,mat,rt,cc,ca);
+      restoreFxAfterPrepass();
+    };
+    ssrPass.renderMetalness=function(renderer,mat,rt,cc,ca){
+      hideFxForPrepass();
+      SSRPass.prototype.renderMetalness.call(this,renderer,mat,rt,cc,ca);
+      restoreFxAfterPrepass();
+    };
     composer.addPass(ssrPass);
   }else if(Q.ssao){
+    // SSAOPass does NOT render the scene — it multiplies AO onto readBuffer.
+    // Without this RenderPass it composites over a stale/undefined buffer.
+    composer.addPass(new RenderPass(scene,camera));
     ssaoPass=new SSAOPass(scene,camera,innerWidth,innerHeight,24);
-    ssaoPass.kernelRadius=10; ssaoPass.minDistance=.002; ssaoPass.maxDistance=.12;
+    ssaoPass.kernelRadius=8; ssaoPass.minDistance=.0008; ssaoPass.maxDistance=.02; // fractions of near-far: 0.8u / 20u
+    // stock pass hides only Points/Lines in its normal-depth render — extend to all FX
+    ssaoPass.overrideVisibility=function(){
+      const cache=this._visibilityCache;
+      this.scene.traverse(o=>{ cache.set(o,o.visible); if(isDepthPassPollution(o))o.visible=false; });
+    };
     composer.addPass(ssaoPass);
   }else{
     composer.addPass(new RenderPass(scene,camera));
