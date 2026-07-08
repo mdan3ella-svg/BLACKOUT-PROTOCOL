@@ -394,7 +394,111 @@ const AudioSys={
     g.gain.setValueAtTime(.001,t); g.gain.exponentialRampToValueAtTime(.22,t+dur);
     o.connect(g).connect(this.master); o.start(t); o.stop(t+dur+.02); this._chg={o,g}; },
   chargeStop(){ if(this._chg){ try{this._chg.g.gain.cancelScheduledValues(0);this._chg.g.gain.value=0;this._chg.o.stop();}catch(e){} this._chg=null; } },
-  ping(f=1200,v=.18){ this.zap(f,.09,v,1.2); }
+  ping(f=1200,v=.18){ this.zap(f,.09,v,1.2); },
+
+  /* ============ SOUNDTRACK ============
+     Loops ./blackoutprotocol.mp3 when hosted beside index.html.
+     Absent, synthesizes an ominous procedural score:
+     beating sub drones + dissonant pad + deep heartbeat pulse,
+     with a tension layer driven by the global awareness meter. */
+  musicBytes:null, musicStarted:false, musicGain:null, tensionGain:null,
+  _tLast:0, _thumpIv:null,
+  async fetchMusic(){ // called during boot — bytes only, no AudioContext needed yet
+    try{
+      const r=await fetch('blackoutprotocol.mp3');
+      if(r.ok){ this.musicBytes=await r.arrayBuffer(); return true; }
+    }catch(e){}
+    return false;
+  },
+  async startMusic(){ // requires a user gesture first (ensure() called)
+    if(this.musicStarted||!this.ctx)return;
+    this.musicStarted=true;
+    this.musicGain=this.ctx.createGain(); this.musicGain.gain.value=.55;
+    this.musicGain.connect(this.master);
+    if(this.musicBytes){
+      try{
+        const buf=await this.ctx.decodeAudioData(this.musicBytes.slice(0));
+        const src=this.ctx.createBufferSource();
+        src.buffer=buf; src.loop=true;
+        src.connect(this.musicGain); src.start();
+        this._buildTension(); // tension layer rides on top, very quiet
+        return;
+      }catch(e){ /* corrupt file — fall through to synth */ }
+    }
+    this._buildScore();
+    this._buildTension();
+  },
+  _mkNoise(){ const sr=this.ctx.sampleRate, buf=this.ctx.createBuffer(1,sr*2,sr), d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    const s=this.ctx.createBufferSource(); s.buffer=buf; s.loop=true; return s; },
+  _lfo(freq,depth,base,param){ const o=this.ctx.createOscillator(),g=this.ctx.createGain();
+    o.frequency.value=freq; g.gain.value=depth; param.value=base;
+    o.connect(g).connect(param); o.start(); },
+  _buildScore(){
+    const c=this.ctx, out=this.musicGain;
+    // beating sub drones — 55Hz vs 58.27Hz, a queasy slow throb
+    const subLP=c.createBiquadFilter(); subLP.type='lowpass'; subLP.frequency.value=170;
+    subLP.connect(out);
+    for(const [f,g] of [[55,.15],[58.27,.11],[36.71,.09]]){
+      const o=c.createOscillator(),gg=c.createGain();
+      o.type='sine'; o.frequency.value=f; gg.gain.value=g;
+      o.connect(gg).connect(subLP); o.start();
+    }
+    // dissonant pad — A minor smeared with a flat 9th, breathing through a filter
+    const padLP=c.createBiquadFilter(); padLP.type='lowpass'; padLP.frequency.value=420; padLP.Q.value=1.1;
+    const padG=c.createGain(); padG.gain.value=.05;
+    padLP.connect(padG).connect(out);
+    for(const [f,g] of [[110,.9],[130.81,.7],[164.81,.6],[116.54,.32]]){
+      const o=c.createOscillator(),gg=c.createGain();
+      o.type='sawtooth'; o.frequency.value=f; o.detune.value=rand(-6,6); gg.gain.value=g;
+      o.connect(gg).connect(padLP); o.start();
+    }
+    this._lfo(.045,260,460,padLP.frequency); // slow breathing sweep
+    // subterranean wind
+    const wind=this._mkNoise();
+    const windBP=c.createBiquadFilter(); windBP.type='bandpass'; windBP.frequency.value=420; windBP.Q.value=.6;
+    const windG=c.createGain(); windG.gain.value=.045;
+    wind.connect(windBP).connect(windG).connect(out); wind.start();
+    this._lfo(.03,320,520,windBP.frequency);
+    // deep heartbeat — every 2.6s the mountain remembers you're inside it
+    this._thumpIv=setInterval(()=>{
+      if(!this.ctx||this.ctx.state!=='running')return;
+      const t=this.ctx.currentTime;
+      const o=c.createOscillator(),g=c.createGain();
+      o.type='sine'; o.frequency.setValueAtTime(48,t); o.frequency.exponentialRampToValueAtTime(27,t+.4);
+      g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(.3,t+.02); g.gain.exponentialRampToValueAtTime(.0001,t+.55);
+      o.connect(g).connect(out); o.start(t); o.stop(t+.6);
+    },2600);
+  },
+  _buildTension(){
+    const c=this.ctx;
+    this.tensionGain=c.createGain(); this.tensionGain.gain.value=0;
+    this.tensionGain.connect(this.musicGain);
+    // shivering minor-second cluster
+    const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=300;
+    hp.connect(this.tensionGain);
+    for(const f of [220,233.08,311.13]){
+      const o=c.createOscillator(),g=c.createGain(),trem=c.createOscillator(),tg=c.createGain();
+      o.type='sawtooth'; o.frequency.value=f; g.gain.value=.05;
+      trem.frequency.value=rand(5,7); tg.gain.value=.03; trem.connect(tg).connect(g.gain);
+      o.connect(g).connect(hp); o.start(); trem.start();
+    }
+    // urgent sub pulse
+    const po=c.createOscillator(),pg=c.createGain(),plfo=c.createOscillator(),plg=c.createGain();
+    po.type='sine'; po.frequency.value=55; pg.gain.value=0;
+    plfo.type='square'; plfo.frequency.value=2.2; plg.gain.value=.09;
+    plfo.connect(plg).connect(pg.gain);
+    po.connect(pg).connect(this.tensionGain); po.start(); plfo.start();
+  },
+  setTension(v){ // v 0..1 — follows the awareness meter
+    if(!this.tensionGain||!this.ctx)return;
+    v=clamp(v,0,1);
+    if(Math.abs(v-this._tLast)<.02)return;
+    this._tLast=v;
+    this.tensionGain.gain.setTargetAtTime(v*(this.musicBytes?.35:.85),this.ctx.currentTime,1.1);
+  },
+  duckMusic(v,fast){ if(this.musicGain&&this.ctx)
+    this.musicGain.gain.setTargetAtTime(.55*v,this.ctx.currentTime,fast?.15:.6); }
 };
 
 /* ---------------- renderer / scene ---------------- */
@@ -582,8 +686,13 @@ async function loadAssets(){
   }else{
     bootLog('orb.glb ABSENT — <b>SYNTHESIZING</b> PROCEDURAL SHELL');
   }
+  bootLog('SCANNING FOR SCORE: blackoutprotocol.mp3');
+  const gotMusic=await AudioSys.fetchMusic();
+  bootLog(gotMusic?'SOUNDTRACK ACQUIRED ................ <b>OK</b>'
+                  :'blackoutprotocol.mp3 ABSENT — <b>SYNTHESIZING</b> OMINOUS SCORE');
   bootLog('ALL SYSTEMS NOMINAL — <b>PROTOCOL ARMED</b>');
-  $('assetNote').textContent=orbFromFile?'ORB ASSET: orb.glb LOADED':'ORB ASSET: PROCEDURAL FALLBACK — DROP orb.glb BESIDE index.html TO OVERRIDE';
+  $('assetNote').textContent=(orbFromFile?'ORB ASSET: orb.glb LOADED':'ORB ASSET: PROCEDURAL FALLBACK — DROP orb.glb BESIDE index.html TO OVERRIDE')
+    +'  ·  '+(gotMusic?'SCORE: blackoutprotocol.mp3':'SCORE: PROCEDURAL SYNTH — DROP blackoutprotocol.mp3 TO OVERRIDE');
 }
 
 /* procedural ORB fallback — biomech containment sphere */
@@ -1021,6 +1130,7 @@ function killPlayer(why){
   AudioSys.noiseBurst(1,.6,700);
   setDroneOpacity(0);
   setTimeout(()=>{ $('deathReason').textContent=why||'AIRFRAME DESTROYED'; show('death'); game.state='DEATH';
+    AudioSys.duckMusic(.3);
     document.exitPointerLock&&document.exitPointerLock(); },900);
 }
 
@@ -1923,6 +2033,7 @@ function startMission(){
 function pauseGame(){
   if(game.state!=='PLAY')return;
   game.state='PAUSE'; show('pause');
+  AudioSys.duckMusic(.22,true);
   document.exitPointerLock&&document.exitPointerLock();
 }
 function levelComplete(){
@@ -1943,11 +2054,11 @@ function levelComplete(){
 }
 
 /* buttons */
-$('btnStart').onclick=()=>{AudioSys.ensure();showBriefing(game.levelIndex);};
-$('btnDeploy').onclick=()=>{AudioSys.ensure();startMission();};
-$('btnResume').onclick=()=>{show(null);game.state='PLAY';canvas.requestPointerLock();};
-$('btnRestart').onclick=()=>{startMission();};
-$('btnRetry').onclick=()=>{startMission();};
+$('btnStart').onclick=()=>{AudioSys.ensure();AudioSys.startMusic();showBriefing(game.levelIndex);};
+$('btnDeploy').onclick=()=>{AudioSys.ensure();AudioSys.startMusic();AudioSys.duckMusic(1);startMission();};
+$('btnResume').onclick=()=>{show(null);game.state='PLAY';AudioSys.duckMusic(1);canvas.requestPointerLock();};
+$('btnRestart').onclick=()=>{AudioSys.duckMusic(1);startMission();};
+$('btnRetry').onclick=()=>{AudioSys.duckMusic(1);startMission();};
 $('btnAbort').onclick=()=>{show('title');game.state='TITLE';};
 $('btnNext').onclick=()=>{game.levelIndex++;showBriefing(game.levelIndex);};
 $('btnAgain').onclick=()=>{game.levelIndex=0;game.stats={kills:0,alerts:0,deaths:0,startTime:game.time};show('title');game.state='TITLE';};
@@ -1992,6 +2103,7 @@ function tick(){
       }
     }
     if(game.level.check)game.level.check(dt);
+    AudioSys.setTension(awareness.value/100);
     if(game.level.objectives.every(o=>o.done))levelComplete();
     // exit beacon pulse
     if(game.level.exitBeacon){ const r=game.level.exitBeacon.userData.ring;
@@ -1999,6 +2111,7 @@ function tick(){
     updateHUD();
   }else{
     // ambient drift on menus
+    AudioSys.setTension(0);
     sparks.update(dt); trail.update(dt); updatePulses(dt);
     if(player.mixer)player.mixer.update(dt*.4);
   }
