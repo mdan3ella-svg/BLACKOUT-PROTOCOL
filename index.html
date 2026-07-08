@@ -25,11 +25,10 @@ canvas#gl{display:block;width:100%;height:100%}
 .hidden{display:none!important}
 
 /* scanlines + vignette film */
-#film{position:fixed;inset:0;pointer-events:none;z-index:40;
-  background:repeating-linear-gradient(0deg,rgba(0,0,0,.13) 0 1px,transparent 1px 3px);
-  mix-blend-mode:overlay;opacity:.5}
+/* scanline film retired — the NV grade in the shader owns the optic look now */
+#film{display:none}
 #staticVig{position:fixed;inset:0;pointer-events:none;z-index:39;
-  background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,.55) 100%)}
+  background:radial-gradient(ellipse at center,transparent 62%,rgba(0,10,14,.32) 100%)}
 
 /* ---------- boot ---------- */
 #boot>*{position:relative;z-index:1}
@@ -132,8 +131,14 @@ canvas#gl{display:block;width:100%;height:100%}
 #wep .w.sel{opacity:1;color:var(--amber)}
 #wep .w b{color:var(--cyan);font-weight:600}
 
-#cross{position:absolute;left:50%;top:50%;width:56px;height:56px;transform:translate(-50%,-50%)}
+#cross{position:absolute;left:50%;top:50%;width:min(44vmin,400px);height:min(44vmin,400px);transform:translate(-50%,-50%)}
 #cross svg{width:100%;height:100%;overflow:visible}
+#cross .scopeSpin{transform-origin:150px 150px;animation:scopeSpin 14s linear infinite}
+@keyframes scopeSpin{to{transform:rotate(360deg)}}
+#scopeData{position:absolute;left:50%;top:50%;transform:translate(-50%,calc(min(22vmin,200px) + 8px));
+  font-size:12px;letter-spacing:.26em;color:var(--cyan);opacity:.9;text-align:center;white-space:nowrap}
+#nvTag{position:absolute;top:66px;right:30px;font-size:10px;letter-spacing:.35em;color:var(--cyan);opacity:.6}
+#nvTag b{animation:blink 1.6s infinite;font-weight:400}
 #hitmark{position:absolute;left:50%;top:50%;width:34px;height:34px;transform:translate(-50%,-50%) rotate(45deg);opacity:0}
 #hitmark:before,#hitmark:after{content:"";position:absolute;background:var(--amber)}
 #hitmark:before{left:50%;top:0;width:2px;height:100%;margin-left:-1px}
@@ -141,7 +146,7 @@ canvas#gl{display:block;width:100%;height:100%}
 #hitmark.pop{animation:hm .22s ease-out}
 @keyframes hm{0%{opacity:1;transform:translate(-50%,-50%) rotate(45deg) scale(.6)}100%{opacity:0;transform:translate(-50%,-50%) rotate(45deg) scale(1.25)}}
 
-#msg{position:absolute;left:50%;top:64%;transform:translateX(-50%);font-size:16px;font-weight:600;letter-spacing:.3em;color:var(--cyan);text-shadow:0 0 14px rgba(79,209,197,.6);opacity:0;transition:opacity .3s;text-align:center}
+#msg{position:absolute;left:50%;top:72%;transform:translateX(-50%);font-size:16px;font-weight:600;letter-spacing:.3em;color:var(--cyan);text-shadow:0 0 14px rgba(79,209,197,.6);opacity:0;transition:opacity .3s;text-align:center}
 #dmgVig{position:fixed;inset:0;pointer-events:none;z-index:31;opacity:0;background:radial-gradient(ellipse at center,transparent 46%,rgba(255,30,40,.5) 100%);transition:opacity .12s}
 #empFlash{position:fixed;inset:0;pointer-events:none;z-index:31;opacity:0;background:radial-gradient(ellipse at center,rgba(178,107,255,.28),transparent 70%)}
 
@@ -290,14 +295,27 @@ canvas#gl{display:block;width:100%;height:100%}
     <div class="w"><b>E</b> EMP BURST</div>
   </div>
   <div id="radarWrap"><div id="radarLab">TACTICAL</div><canvas id="radar" width="170" height="170"></canvas></div>
+  <div id="nvTag" class="mono">NV-OPTIC <b>▮</b> LIDAR ACTIVE</div>
   <div id="cross">
-    <svg viewBox="0 0 56 56">
-      <circle cx="28" cy="28" r="2" fill="#4fd1c5"/>
-      <path d="M28 8 L28 16 M28 40 L28 48 M8 28 L16 28 M40 28 L48 28" stroke="#4fd1c5" stroke-width="1.5" opacity=".8"/>
-      <circle id="chargeRing" cx="28" cy="28" r="22" fill="none" stroke="#ff7a1a" stroke-width="2.5"
-        stroke-dasharray="138.2" stroke-dashoffset="138.2" transform="rotate(-90 28 28)"/>
+    <svg viewBox="0 0 300 300">
+      <circle cx="150" cy="150" r="140" fill="none" stroke="#4fd1c5" stroke-width="1.5" opacity=".38"/>
+      <circle cx="150" cy="150" r="140" fill="none" stroke="#4fd1c5" stroke-width="9" opacity=".45"
+        pathLength="360" stroke-dasharray="0.6 14.4"/>
+      <circle cx="150" cy="150" r="140" fill="none" stroke="#4fd1c5" stroke-width="15" opacity=".6"
+        pathLength="360" stroke-dasharray="1.4 88.6"/>
+      <g class="scopeSpin" opacity=".32">
+        <path d="M150 26 A124 124 0 0 1 274 150" fill="none" stroke="#4fd1c5" stroke-width="2"/>
+        <path d="M150 274 A124 124 0 0 1 26 150" fill="none" stroke="#4fd1c5" stroke-width="2"/>
+      </g>
+      <circle id="chargeRing" cx="150" cy="150" r="120" fill="none" stroke="#ff7a1a" stroke-width="3"
+        stroke-dasharray="754" stroke-dashoffset="754" transform="rotate(-90 150 150)"/>
+      <path d="M150 98 L150 128 M150 172 L150 202 M98 150 L128 150 M172 150 L202 150"
+        stroke="#4fd1c5" stroke-width="1.6" opacity=".9"/>
+      <path d="M150 141 L146 150 L150 159 L154 150 Z" fill="none" stroke="#4fd1c5" stroke-width="1.2" opacity=".7"/>
+      <circle cx="150" cy="150" r="2.1" fill="#4fd1c5"/>
     </svg>
   </div>
+  <div id="scopeData" class="mono">RNG ——.— · HDG 000°</div>
   <div id="hitmark"></div>
   <div id="msg"></div>
 </div>
@@ -510,7 +528,7 @@ try{
 renderer.setSize(innerWidth,innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio,Q.pixelRatio));
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.15;
+renderer.toneMappingExposure=1.3;
 renderer.shadowMap.enabled=true;
 renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 
@@ -521,7 +539,7 @@ camera.position.set(0,8,14);
 
 const pmrem=new THREE.PMREMGenerator(renderer);
 scene.environment=pmrem.fromScene(new RoomEnvironment(),.06).texture;
-scene.environmentIntensity=.55;
+scene.environmentIntensity=.72;
 
 /* ---------------- world containers ---------------- */
 const worldGroup=new THREE.Group(); scene.add(worldGroup);   // level geometry
@@ -542,6 +560,36 @@ function clearWorld(){
   worldGroup.traverse(o=>{ if(o.geometry&&!o.userData.shared)o.geometry.dispose(); });
   worldGroup.clear(); fxGroup.clear();
   colliders.length=0; losMeshes.length=0; reflectiveMeshes.length=0;
+}
+
+/* ---------------- LIDAR wireframe optic ----------------
+   Everything the sensor sees — except the Sentinel itself — carries a
+   faded cyan wireframe. Overlays share the base mesh's geometry and ride
+   as children so they track moving objects (doors, orbs) for free. */
+const lidarMat=new THREE.MeshBasicMaterial({wireframe:true,color:0x4fd1c5,transparent:true,
+  opacity:.075,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,toneMapped:false});
+lidarMat.userData={shared:true};
+function lidarify(root){
+  const targets=[];
+  root.traverse(o=>{
+    if(o.isMesh&&!o.userData.lidar&&!o.userData.lidarDone&&o.material&&o.material.isMeshStandardMaterial){
+      if(o.material.emissiveIntensity>1)return; // glow strips / cores stay clean
+      targets.push(o);
+    }
+  });
+  for(const o of targets){
+    o.userData.lidarDone=true;
+    if(o.isInstancedMesh){
+      const w=new THREE.InstancedMesh(o.geometry,lidarMat,o.count);
+      w.instanceMatrix=o.instanceMatrix; // share the matrix attribute — static field, zero copy
+      w.userData.lidar=true; w.userData.shared=true; w.frustumCulled=false;
+      o.parent.add(w);
+    }else{
+      const w=new THREE.Mesh(o.geometry,lidarMat);
+      w.userData.lidar=true; w.userData.shared=true;
+      o.add(w);
+    }
+  }
 }
 
 /* ---------------- particle engine ---------------- */
@@ -968,7 +1016,7 @@ function updatePlayer(dt){
   if(lmb&&!player.overheated&&!player.cloak)fireWeapon();
   if(player.charging){
     player.chargeT=Math.min(1.1,player.chargeT+dt);
-    $('chargeRing').style.strokeDashoffset=138.2*(1-clamp(player.chargeT/1.1,0,1));
+    $('chargeRing').style.strokeDashoffset=754*(1-clamp(player.chargeT/1.1,0,1));
   }
 }
 
@@ -1008,7 +1056,7 @@ function fireWeapon(){
 function releaseRail(){
   AudioSys.chargeStop();
   const k=player.chargeT; player.charging=false;
-  $('chargeRing').style.strokeDashoffset=138.2;
+  $('chargeRing').style.strokeDashoffset=754;
   if(k<.35){return;}
   aimDirCache=aimDir().clone();
   const origin=player.pos.clone().addScaledVector(aimDirCache,2.4);
@@ -1176,6 +1224,7 @@ class Orb{
     }
     this.light=new THREE.PointLight(T.tint,4,14,2);
     this.group.add(this.light);
+    lidarify(this.group); // covers mid-mission hive spawns too
     this.vel=new THREE.Vector3();
     this.facing=new THREE.Vector3(0,0,1);
   }
@@ -1387,7 +1436,12 @@ function box(w,h,d,mat,x,y,z,collide=true,ry=0){
 function floorPlane(size,mat,y=0,reflective=false){
   const m=new THREE.Mesh(new THREE.PlaneGeometry(size,size),mat);
   m.rotation.x=-Math.PI/2; m.position.y=y; m.receiveShadow=true;
+  m.userData.lidarDone=true; // 1-seg plane wireframe is just a diagonal — use a grid instead
   worldGroup.add(m);
+  const wire=new THREE.Mesh(new THREE.PlaneGeometry(size,size,36,36),lidarMat);
+  wire.rotation.x=-Math.PI/2; wire.position.y=y+.07;
+  wire.userData.lidar=true; wire.userData.shared=true;
+  worldGroup.add(wire);
   if(reflective)reflectiveMeshes.push(m);
   return m;
 }
@@ -1782,7 +1836,12 @@ const LEVELS=[
     const L=640;
     const fl=new THREE.Mesh(new THREE.PlaneGeometry(52,L),MAT.floor);
     fl.rotation.x=-Math.PI/2; fl.position.z=-L/2+20; fl.receiveShadow=true;
+    fl.userData.lidarDone=true;
     worldGroup.add(fl); reflectiveMeshes.push(fl);
+    const flWire=new THREE.Mesh(new THREE.PlaneGeometry(52,L,8,96),lidarMat);
+    flWire.rotation.x=-Math.PI/2; flWire.position.set(0,.07,-L/2+20);
+    flWire.userData.lidar=true; flWire.userData.shared=true;
+    worldGroup.add(flWire);
     for(const side of [-1,1]){
       const w=new THREE.Mesh(new THREE.BoxGeometry(4,42,L),MAT.wall);
       w.position.set(side*28,21,-L/2+20); worldGroup.add(w); addCollider(w);
@@ -1885,6 +1944,7 @@ function drawRadar(){
   c.fillStyle='#ff7a1a';
   c.beginPath();c.moveTo(h,h-5);c.lineTo(h-4,h+4);c.lineTo(h+4,h+4);c.closePath();c.fill();
 }
+let rngStr='——.—', rngT=0;
 function updateHUD(){
   $('bShield').firstElementChild.style.width=(player.shield/player.shieldMax*100)+'%';
   $('bHull').firstElementChild.style.width=(player.hull/player.hullMax*100)+'%';
@@ -1901,16 +1961,34 @@ function updateHUD(){
   else if(player.surge){m='SURGE';cls='surge';}
   else if(player.vel.length()<1.5)m='HOVER';
   mode.textContent=m; mode.className=cls;
-  $('telem').textContent='VEL '+player.vel.length().toFixed(1).padStart(4,'0')+' · ALT '+Math.max(0,player.pos.y-(game.level?.floorY??0)).toFixed(1).padStart(5,'0');
+  $('telem').textContent='VEL '+player.vel.length().toFixed(1).padStart(4,'0')
+    +' · ALT '+Math.max(0,player.pos.y-(game.level?.floorY??0)).toFixed(1).padStart(5,'0')
+    +' · GRID '+Math.round(player.pos.x)+','+Math.round(player.pos.z);
+  // scope telemetry — range to whatever sits under the reticle
+  if(game.time-rngT>.12){
+    rngT=game.time;
+    raycaster.setFromCamera({x:0,y:0},camera); raycaster.far=500;
+    let d=null;
+    const hits=raycaster.intersectObjects(losMeshes,false);
+    if(hits.length)d=hits[0].distance;
+    for(const o of orbs){
+      if(o.dead)continue;
+      const t=raySphere(camera.position,raycaster.ray.direction,o.pos,o.hitR);
+      if(t!==null&&(d===null||t<d))d=t;
+    }
+    rngStr=d===null?'——.—':d.toFixed(1).padStart(5,'0');
+  }
+  const hdg=((-player.yaw*180/Math.PI)%360+360)%360;
+  $('scopeData').textContent='RNG '+rngStr+' · HDG '+String(Math.round(hdg)%360).padStart(3,'0')+'°';
   drawRadar();
 }
 
 /* ---------------- post-processing ---------------- */
 let composer=null, bloomPass=null, gradePass=null, ssrPass=null, ssaoPass=null;
 const GradeShader={
-  uniforms:{tDiffuse:{value:null},uTime:{value:0},uVig:{value:.42},uGrain:{value:.05},uAber:{value:.0016}},
+  uniforms:{tDiffuse:{value:null},uTime:{value:0},uVig:{value:.32},uGrain:{value:.016},uAber:{value:.0016},uNV:{value:1}},
   vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
-  fragmentShader:`uniform sampler2D tDiffuse;uniform float uTime,uVig,uGrain,uAber;varying vec2 vUv;
+  fragmentShader:`uniform sampler2D tDiffuse;uniform float uTime,uVig,uGrain,uAber,uNV;varying vec2 vUv;
     float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
     void main(){
       vec2 c=vUv-.5;
@@ -1920,6 +1998,11 @@ const GradeShader={
       col.r=texture2D(tDiffuse,vUv+off).r;
       col.g=texture2D(tDiffuse,vUv).g;
       col.b=texture2D(tDiffuse,vUv-off).b;
+      // NV-OPTIC: cyan-blue luminance grade + shadow lift for visibility
+      float lum=dot(col,vec3(.299,.587,.114));
+      vec3 nvc=vec3(lum*.5,lum*1.04,lum)*1.32;
+      col=mix(col,nvc,uNV*.5);
+      col+=vec3(0.,.014,.017)*uNV;
       col*=1.-uVig*smoothstep(.18,.85,r2*2.6);
       col+=(hash(vUv*vec2(1920.,1080.)+uTime*60.)-.5)*uGrain;
       gl_FragColor=vec4(col,1.);
@@ -1999,6 +2082,7 @@ function loadLevel(i){
   game.level=Object.assign(Object.create(proto),{objectives:proto.objectives.map(o=>({...o,done:false}))});
   game.level.build();
   for(const [type,pos,wps] of game.level.spawnOrbs)orbs.push(new Orb(type,pos,wps));
+  lidarify(worldGroup); // sensor wireframe on everything the optic sees — never the craft
   player.pos.copy(game.level.playerStart); player.vel.set(0,0,0);
   player.yaw=Math.atan2(-(0-player.pos.x),-(0-player.pos.z)); player.pitch=0; // face level center / down-corridor
   player.shield=player.shieldMax; player.hull=player.hullMax;
