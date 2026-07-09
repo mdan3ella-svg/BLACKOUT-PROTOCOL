@@ -4,7 +4,8 @@
 
 A AAA-styled single-file stealth shooter for the browser. Pilot the AGV-Sentinel Alpha anti-grav drone through a five-mission infiltration of Site NADIR — a blacksite that does not exist on any map — while MRV-class "MANTA" interceptors hunt you through storm-soaked canyons, a top-secret hangar, a 240-meter ventilation shaft, and the gravity-well reactor at the bottom of it all.
 
-**► PLAY:** `https://mdan3ella-svg.github.io/<REPO-NAME>/`
+**► PLAY:** `https://mdan3ella-svg.github.io/<BLACKOUT-PROTOCOL
+>/`
 
 No install. No build step. One HTML file, two GLB assets, and a browser.
 
