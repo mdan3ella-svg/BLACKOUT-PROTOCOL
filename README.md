@@ -4,8 +4,7 @@
 
 A AAA-styled single-file stealth shooter for the browser. Pilot the AGV-Sentinel Alpha anti-grav drone through a five-mission infiltration of Site NADIR — a blacksite that does not exist on any map — while MRV-class "MANTA" interceptors hunt you through storm-soaked canyons, a top-secret hangar, a 240-meter ventilation shaft, and the gravity-well reactor at the bottom of it all.
 
-**► PLAY:** `https://mdan3ella-svg.github.io/<BLACKOUT-PROTOCOL
->/`
+**► PLAY:** `https://mdan3ella-svg.github.io/BLACKOUT-PROTOCOL/)`
 
 No install. No build step. One HTML file, two GLB assets, and a browser.
 
@@ -82,9 +81,13 @@ To deploy on GitHub Pages: push these files to the repo root, then **Settings �
 
 ## License
 
-Source code is released under the **MIT License** (see [`LICENSE`](LICENSE)).
+**© 2026 VERTASCAN — All Rights Reserved.** This repository is **source-visible for reference only** (see [`LICENSE`](LICENSE)).
 
-**Excluded from the MIT grant:** the VERTASCAN name, logo, and brand identity, and all bundled art/audio assets (`blue.glb`, `mantaray-XHD.glb`, `blackoutprotocol.mp3`, `blackoutprotocol.jpg`). These remain **© VERTASCAN, all rights reserved** and may not be redistributed or reused outside this project without permission.
+You may read the code for personal study and play the game at the official GitHub Pages URL. You may **not** copy, modify, redistribute, re-host, or reuse the code, the VERTASCAN brand, the BLACKOUT PROTOCOL title and narrative, or any bundled asset (`blue.glb`, `mantaray-XHD.glb`, `blackoutprotocol.mp3`, `blackoutprotocol.jpg`) in any other project without written permission.
+
+Three.js is loaded at runtime under its own MIT License (© three.js authors).
+
+For licensing or collaboration inquiries: [github.com/mdan3ella-svg](https://github.com/mdan3ella-svg)
 
 ---
 
