@@ -1,0 +1,73 @@
+VERTASCAN // BLACKOUT PROTOCOL
+PROPRIETARY LICENSE — ALL RIGHTS RESERVED
+
+Copyright (c) 2026 VERTASCAN. All rights reserved.
+
+This repository is published as SOURCE-VISIBLE FOR REFERENCE ONLY.
+Making the source code publicly viewable does NOT grant any license,
+express or implied, to use it. No rights are waived.
+
+1. GRANT
+
+   Permission is granted ONLY to:
+
+   a) View and read the source code in this repository for personal,
+      non-commercial reference and educational study; and
+   b) Play the game as deployed by VERTASCAN at its official
+      GitHub Pages URL.
+
+   No other rights are granted.
+
+2. RESTRICTIONS
+
+   Except as expressly permitted in Section 1, you may NOT, in whole
+   or in part:
+
+   a) Copy, reproduce, or redistribute the source code or any file in
+      this repository;
+   b) Modify, adapt, translate, or create derivative works;
+   c) Use the code or assets in any other project, product, or
+      service, whether commercial or non-commercial;
+   d) Re-host, mirror, or deploy the game or any portion of it;
+   e) Sell, sublicense, rent, or otherwise commercialize the Software;
+   f) Train, fine-tune, or evaluate machine-learning models on the
+      contents of this repository;
+   g) Remove or alter any copyright, trademark, or attribution notice.
+
+   Forking on GitHub is permitted solely to the extent required by the
+   GitHub Terms of Service for platform functionality; no additional
+   rights attach to a fork.
+
+3. BRAND AND ASSETS
+
+   The VERTASCAN name, wordmark, logo, and brand identity; the
+   "BLACKOUT PROTOCOL" title, campaign narrative, and mission text;
+   and all bundled 3D model, audio, and image assets — including but
+   not limited to blue.glb, mantaray-XHD.glb, blackoutprotocol.mp3,
+   and blackoutprotocol.jpg — are the exclusive property of VERTASCAN
+   and are protected in addition to, and independently of, the source
+   code restrictions above.
+
+4. THIRD-PARTY COMPONENTS
+
+   Three.js (https://threejs.org) is a third-party library loaded at
+   runtime and is licensed separately under the MIT License,
+   (c) 2010-2026 three.js authors. Nothing in this license restricts
+   your rights in Three.js itself.
+
+5. NO WARRANTY
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+   EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+   MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+   NONINFRINGEMENT. IN NO EVENT SHALL VERTASCAN BE LIABLE FOR ANY
+   CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN
+   CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+6. PERMISSIONS
+
+   For licensing inquiries, collaboration, or permission requests,
+   contact VERTASCAN via the GitHub profile at
+   https://github.com/mdan3ella-svg.
+
+Unauthorized use is a violation of copyright law.
