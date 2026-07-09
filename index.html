@@ -142,33 +142,61 @@ canvas#gl{display:block;width:100%;height:100%;touch-action:none}
   font-size:12px;letter-spacing:.26em;color:var(--cyan);opacity:.9;text-align:center;white-space:nowrap}
 #nvTag{position:absolute;top:66px;right:30px;font-size:10px;letter-spacing:.35em;color:var(--cyan);opacity:.6}
 
-/* ---------- touch controls ---------- */
-#touchUI{position:fixed;inset:0;z-index:34;display:none;pointer-events:none}
+/* ---------- touch controls ----------
+   Three size tiers, viewport-scaled:
+     --tp primary   (FIRE / THRUST)   — corner anchors
+     --ts secondary (RAIL / EMP / rocker)
+     --tu utility   (top-strip chips)
+   Each scheme owns its zones: PADS keeps the whole left half clean
+   for the floating stick and packs combat into a right-corner arc;
+   TILT anchors THRUST bottom-left and has no fire buttons at all
+   (tap = fire, flick = rail). Low-frequency toggles live in a slim
+   chip strip on the top edge, out of the action zone. */
+#touchUI{position:fixed;inset:0;z-index:34;display:none;pointer-events:none;
+  --tp:clamp(64px,16vmin,96px);
+  --ts:clamp(46px,11.5vmin,64px);
+  --tu:clamp(32px,8.5vmin,44px);
+  --edgeR:max(14px,env(safe-area-inset-right));
+  --edgeL:max(14px,env(safe-area-inset-left));
+  --bot:max(16px,env(safe-area-inset-bottom))}
 #touchUI.on{display:block}
 .tbtn{position:absolute;pointer-events:auto;display:flex;align-items:center;justify-content:center;
   border:1px solid var(--line);border-radius:50%;background:rgba(6,9,11,.5);color:var(--cyan);
-  font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.14em;font-size:11px;
+  font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:.12em;
+  font-size:clamp(9px,2.4vmin,12px);
   touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none}
-.tbtn:active,.tbtn.held{background:rgba(79,209,197,.24);box-shadow:0 0 14px rgba(79,209,197,.35)}
+.tbtn:active,.tbtn.held,.tbtn.lit{background:rgba(79,209,197,.24);box-shadow:0 0 14px rgba(79,209,197,.35)}
 .tbtn.amber{color:var(--amber);border-color:rgba(255,122,26,.45)}
-.tbtn.amber:active,.tbtn.amber.held{background:rgba(255,122,26,.22);box-shadow:0 0 14px rgba(255,122,26,.35)}
-#tFire{right:22px;bottom:104px;width:88px;height:88px;font-size:14px}
-#tRail{right:120px;bottom:74px;width:64px;height:64px}
-#tThr{left:24px;bottom:104px;width:88px;height:88px;font-size:14px;display:none}
-#tCal{left:126px;bottom:78px;width:54px;height:54px;display:none}
-#tAsc{right:36px;bottom:214px;width:58px;height:58px}
-#tDsc{right:110px;bottom:160px;width:58px;height:58px}
-#tWpn{right:26px;top:44%;width:48px;height:48px}
-#tClk{right:26px;top:calc(44% + 58px);width:48px;height:48px}
-#tEmp{right:26px;top:calc(44% + 116px);width:48px;height:48px}
-#tSrg{right:88px;top:calc(44% + 88px);width:48px;height:48px}
-#tPause{left:50%;top:8px;transform:translateX(-50%);width:64px;height:34px;border-radius:8px}
-#stickL{position:absolute;width:124px;height:124px;border:1px solid var(--line);border-radius:50%;
+.tbtn.amber:active,.tbtn.amber.held,.tbtn.amber.lit{background:rgba(255,122,26,.22);box-shadow:0 0 14px rgba(255,122,26,.35)}
+/* right-thumb combat arc — FIRE anchors the corner, RAIL and EMP fan around it */
+#tFire{right:var(--edgeR);bottom:var(--bot);width:var(--tp);height:var(--tp);
+  font-size:clamp(11px,3vmin,14px)}
+#tRail{right:calc(var(--edgeR) + var(--tp)*1.14);bottom:calc(var(--bot) + var(--tp)*.06);
+  width:var(--ts);height:var(--ts)}
+#tEmp{right:calc(var(--edgeR) + var(--tp)*.82);bottom:calc(var(--bot) + var(--tp)*.92);
+  width:var(--ts);height:var(--ts)}
+/* ASC/DSC — one vertical rocker pill on the right edge, not two floating circles */
+#tRock{position:absolute;pointer-events:none;right:var(--edgeR);
+  bottom:calc(var(--bot) + var(--tp)*1.55);width:var(--ts);height:calc(var(--ts)*2.2)}
+#tRock .tbtn{left:0;width:100%;height:50%}
+#tAsc{top:0;border-radius:calc(var(--ts)/2) calc(var(--ts)/2) 0 0;border-bottom-width:0}
+#tDsc{bottom:0;border-radius:0 0 calc(var(--ts)/2) calc(var(--ts)/2)}
+/* THRUST anchors the left corner in TILT (left half is stick-only in PADS) */
+#tThr{left:var(--edgeL);bottom:var(--bot);width:var(--tp);height:var(--tp);
+  font-size:clamp(11px,3vmin,14px);display:none}
+/* utility strip — WPN / CLK / SRG / CAL / pause chips on the top edge */
+#tStrip{position:absolute;pointer-events:none;top:max(8px,env(safe-area-inset-top));
+  left:50%;transform:translateX(-50%);display:flex;gap:clamp(6px,1.5vmin,10px)}
+#tStrip .tbtn{position:static;width:auto;min-width:var(--tu);height:var(--tu);
+  border-radius:9px;padding:0 clamp(8px,2vmin,12px)}
+#stickL{position:absolute;width:calc(var(--ts)*2.3);height:calc(var(--ts)*2.3);
+  border:1px solid var(--line);border-radius:50%;
   background:rgba(6,9,11,.35);display:none;pointer-events:none}
-#stickNub{position:absolute;width:50px;height:50px;border-radius:50%;left:37px;top:37px;
+#stickNub{position:absolute;width:40%;height:40%;left:30%;top:30%;border-radius:50%;
   background:rgba(79,209,197,.35);box-shadow:0 0 12px rgba(79,209,197,.4)}
-#tiltHint{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);display:none;
-  font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.28em;color:var(--cyan);opacity:.55;text-align:center}
+#tiltHint{position:absolute;left:50%;bottom:calc(var(--bot) + 6px);transform:translateX(-50%);display:none;
+  font-family:'Space Mono',monospace;font-size:clamp(8px,2.2vmin,10px);
+  letter-spacing:.28em;color:var(--cyan);opacity:.55;text-align:center;white-space:nowrap}
 
 /* ---------- compact HUD on touch devices / small screens ---------- */
 @media (pointer:coarse),(max-width:900px){
@@ -317,16 +345,20 @@ canvas#gl{display:block;width:100%;height:100%;touch-action:none}
   <div id="stickL"><div id="stickNub"></div></div>
   <div class="tbtn amber" id="tFire">FIRE</div>
   <div class="tbtn" id="tRail">RAIL</div>
-  <div class="tbtn amber" id="tThr">THRUST</div>
-  <div class="tbtn" id="tCal">CAL</div>
-  <div class="tbtn" id="tAsc">ASC</div>
-  <div class="tbtn" id="tDsc">DSC</div>
-  <div class="tbtn" id="tWpn">WPN</div>
-  <div class="tbtn" id="tClk">CLK</div>
   <div class="tbtn amber" id="tEmp">EMP</div>
-  <div class="tbtn" id="tSrg">SRG</div>
-  <div class="tbtn" id="tPause">| |</div>
-  <div id="tiltHint">TILT TO STEER · TAP = FIRE · FLICK UP = RAIL LANCE</div>
+  <div id="tRock">
+    <div class="tbtn" id="tAsc">&#9650;</div>
+    <div class="tbtn" id="tDsc">&#9660;</div>
+  </div>
+  <div class="tbtn amber" id="tThr">THRUST</div>
+  <div id="tStrip">
+    <div class="tbtn" id="tWpn">WPN 1</div>
+    <div class="tbtn" id="tClk">CLK</div>
+    <div class="tbtn" id="tSrg">SRG</div>
+    <div class="tbtn" id="tCal">CAL</div>
+    <div class="tbtn" id="tPause">| |</div>
+  </div>
+  <div id="tiltHint">TILT TO STEER &middot; TAP = FIRE &middot; FLICK UP = RAIL LANCE</div>
 </div>
 
 <!-- HUD -->
@@ -1020,7 +1052,7 @@ const IS_TOUCH=('ontouchstart' in window)||navigator.maxTouchPoints>0;
 const MOBILE={active:IS_TOUCH,scheme:'PADS'};
 const vpad={mx:0,my:0,asc:0,fire:false};
 const tilt={granted:false,b:0,g:0,b0:null,g0:null,thrust:false};
-const touchPts={}; let stickId=null,lookId=null;
+const touchPts={}; let stickId=null,lookId=null,surgeLatch=false;
 
 function tiltRead(){
   if(tilt.b0===null)return{roll:0,pitch:0};
@@ -1090,10 +1122,10 @@ if(IS_TOUCH){
   bindHold('tCal',()=>{ calibrateTilt(); flashMsg('TILT CALIBRATED'); });
   bindHold('tAsc',()=>vpad.asc=1,()=>vpad.asc=0);
   bindHold('tDsc',()=>vpad.asc=-1,()=>vpad.asc=0);
-  bindHold('tWpn',()=>{ player.weapon=player.weapon===1?2:1; selWeapon(); });
+  bindHold('tWpn',()=>{ player.weapon=player.weapon===1?2:1; selWeapon(); $('tWpn').textContent='WPN '+player.weapon; });
   bindHold('tClk',()=>toggleCloak());
   bindHold('tEmp',()=>fireEMP());
-  bindHold('tSrg',()=>keys['ShiftLeft']=true,()=>keys['ShiftLeft']=false);
+  bindHold('tSrg',()=>{ surgeLatch=!surgeLatch; keys['ShiftLeft']=surgeLatch; }); // tap-toggle — a hold doesn't belong on the top edge
   bindHold('tPause',()=>pauseGame());
   $('btnCtl').style.display=''; $('btnCtlPause').style.display='';
   $('btnCtl').onclick=cycleControlScheme; $('btnCtlPause').onclick=cycleControlScheme;
@@ -2361,6 +2393,10 @@ function drawRadar(){
 }
 let rngStr='——.—', rngT=0;
 function updateHUD(){
+  if(MOBILE.active){
+    $('tClk').classList.toggle('lit',player.cloak);
+    $('tSrg').classList.toggle('lit',surgeLatch);
+  }
   $('bShield').firstElementChild.style.width=(player.shield/player.shieldMax*100)+'%';
   $('bHull').firstElementChild.style.width=(player.hull/player.hullMax*100)+'%';
   $('bEnergy').firstElementChild.style.width=(player.energy/player.energyMax*100)+'%';
@@ -2566,6 +2602,7 @@ function startMission(){
   game.state='PLAY';
   if(!MOBILE.active)canvas.requestPointerLock();
   if(MOBILE.active&&MOBILE.scheme==='TILT')calibrateTilt(); // neutral grip = how you hold it at deploy
+  if(MOBILE.active){ surgeLatch=false; keys['ShiftLeft']=false; $('tWpn').textContent='WPN '+player.weapon; }
   flashMsg('MISSION '+LEVELS[game.levelIndex].num+' — '+LEVELS[game.levelIndex].name);
 }
 function pauseGame(){
