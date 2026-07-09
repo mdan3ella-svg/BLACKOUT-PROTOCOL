@@ -342,10 +342,15 @@ import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { SSRPass } from 'three/addons/postprocessing/SSRPass.js';
 
 /* ============================================================
-   VERTASCAN // BLACKOUT PROTOCOL
+   VERTASCAN // BLACKOUT PROTOCOL — v4 "MANTA UPDATE"
    AGV-Sentinel Alpha — anti-gravity covert strike
-   Single-file build. Loads ./blue.glb (drone) and ./orb.glb
-   (enemy shell — procedural fallback engages automatically).
+   Single-file build. Loads ./blue.glb (drone) and
+   ./mantaray-XHD.glb (hostile MRV interceptor — procedural orb
+   fallback engages automatically if the manta is absent).
+   NEW IN v4: MRV-CLASS "MANTA" hostiles (bigger airframes, hover
+   bank/bob animation), BLACKSITE HANGAR mission 02 — a top-secret
+   surface base the Sentinel flies INTO — rotating radar dishes,
+   landing pads, comm domes, and a 5-mission campaign.
    ============================================================ */
 
 const $=id=>document.getElementById(id);
@@ -741,21 +746,33 @@ async function loadAssets(){
       if(m&&m.name==='glass'){ m.roughness=.05; m.envMapIntensity=2.0; }
     }
   });
-  // orb (optional — procedural fallback)
-  bootLog('SCANNING FOR HOSTILE SIGNATURE: orb.glb');
-  const orbGltf=await new Promise(res=>{ gltfLoader.load('orb.glb',res,undefined,()=>res(null)); });
+  // hostile MRV interceptor (optional — procedural orb fallback)
+  bootLog('SCANNING FOR HOSTILE SIGNATURE: mantaray-XHD.glb');
+  const orbGltf=await new Promise(res=>{
+    gltfLoader.load('mantaray-XHD.glb',res,xhr=>{
+      if(xhr.total){ const p=Math.round(xhr.loaded/xhr.total*100);
+        $('bar').style.width=p+'%'; $('bootPct').textContent=p+'% — MRV MANTA SIGNATURE'; }
+    },()=>res(null));
+  });
   if(orbGltf){ orbTemplate=orbGltf.scene; orbFromFile=true;
-    orbTemplate.traverse(o=>{ if(o.isMesh){o.castShadow=true;} });
-    bootLog('ORB SHELL ACQUIRED ................. <b>OK</b>');
+    orbTemplate.traverse(o=>{ if(o.isMesh){
+      o.castShadow=true;
+      const mats=Array.isArray(o.material)?o.material:[o.material];
+      mats.forEach(m=>{ // burners / plane emission / lights feed the bloom pass
+        if(m&&m.emissive&&(m.emissive.r>0||m.emissive.g>0||m.emissive.b>0))
+          m.emissiveIntensity=Math.max(m.emissiveIntensity||1,2.4);
+      });
+    }});
+    bootLog('MRV "MANTA" AIRFRAME ACQUIRED ...... <b>OK</b>');
   }else{
-    bootLog('orb.glb ABSENT — <b>SYNTHESIZING</b> PROCEDURAL SHELL');
+    bootLog('mantaray-XHD.glb ABSENT — <b>SYNTHESIZING</b> PROCEDURAL SHELL');
   }
   bootLog('SCANNING FOR SCORE: blackoutprotocol.mp3');
   const gotMusic=await AudioSys.fetchMusic();
   bootLog(gotMusic?'SOUNDTRACK ACQUIRED ................ <b>OK</b>'
                   :'blackoutprotocol.mp3 ABSENT — <b>SYNTHESIZING</b> OMINOUS SCORE');
   bootLog('ALL SYSTEMS NOMINAL — <b>PROTOCOL ARMED</b>');
-  $('assetNote').textContent=(orbFromFile?'ORB ASSET: orb.glb LOADED':'ORB ASSET: PROCEDURAL FALLBACK — DROP orb.glb BESIDE index.html TO OVERRIDE')
+  $('assetNote').textContent=(orbFromFile?'HOSTILE ASSET: mantaray-XHD.glb LOADED':'HOSTILE ASSET: PROCEDURAL FALLBACK — DROP mantaray-XHD.glb BESIDE index.html TO OVERRIDE')
     +'  ·  '+(gotMusic?'SCORE: blackoutprotocol.mp3':'SCORE: PROCEDURAL SYNTH — DROP blackoutprotocol.mp3 TO OVERRIDE');
 }
 
@@ -781,10 +798,18 @@ function buildProceduralOrb(){
   g.userData.rings=[r1,r2];
   return g;
 }
+/* Blender exports commonly face +Z in glTF while the ORB rig steers +Z-forward.
+   If the manta flies nose-backwards, set MANTA_YAW_FIX to 0. */
+const MANTA_YAW_FIX=Math.PI;
+/* MRV manta wingspan at type-scale 1. The Sentinel's airframe is 3.4u wide —
+   the manta reads as a genuinely bigger hostile at ~2.1x that span, before
+   WARDEN (1.7x) and HIVE (2.3x) multipliers stack on top. */
+const MANTA_SPAN=7.2;
 /* clone template + isolate emissive materials so each orb tints independently */
 function makeOrbMesh(tintHex){
   const src=orbTemplate||buildProceduralOrb();
   const root=orbTemplate?src.clone(true):src; // procedural is built fresh each call
+  if(orbTemplate)root.rotation.y=MANTA_YAW_FIX;
   const emis=[];
   root.traverse(o=>{
     if(o.isMesh&&o.material){
@@ -798,19 +823,23 @@ function makeOrbMesh(tintHex){
       o.material=Array.isArray(o.material)?cloned:cloned[0];
     }
   });
-  if(emis.length===0){ // orb.glb had no emissive parts — add a core beacon
+  if(emis.length===0){ // manta GLB had no emissive parts — add a core beacon
     const core=new THREE.Mesh(new THREE.SphereGeometry(.35,16,12),
       new THREE.MeshStandardMaterial({emissive:tintHex,emissiveIntensity:3,color:0x050505}));
     root.add(core); emis.push(core.material);
   }
-  // normalize to ~2.4u diameter
+  // normalize: manta by wingspan (bigger, imposing), procedural by diagonal
   const bb=new THREE.Box3().setFromObject(root);
-  const size=bb.getSize(new THREE.Vector3()).length()||1;
-  const s=2.9/size; root.scale.multiplyScalar(s);
-  const ctr=bb.getCenter(new THREE.Vector3()).multiplyScalar(s);
-  root.position.sub(ctr);
+  const sz=bb.getSize(new THREE.Vector3());
+  const s=orbTemplate ? MANTA_SPAN/Math.max(sz.x,1e-4) : 2.9/(sz.length()||1);
+  root.scale.multiplyScalar(s);
+  const bb2=new THREE.Box3().setFromObject(root);
+  root.position.sub(bb2.getCenter(new THREE.Vector3()));
   const wrap=new THREE.Group(); wrap.add(root);
   wrap.userData.emis=emis; wrap.userData.inner=root;
+  // body hit radius at type-scale 1 — bolts should connect with the visual hull
+  const sz2=bb2.getSize(new THREE.Vector3());
+  wrap.userData.hitR=orbTemplate ? Math.max(1.6,Math.max(sz2.x,sz2.z)*.38) : 1.6;
   return wrap;
 }
 
@@ -1217,11 +1246,11 @@ class Orb{
     this.state='PATROL'; this.suspicion=0;
     this.fireT=rand(0,T.fireCd);
     this.disabledT=0; this.spawnT=6;
-    this.hitR=1.6*T.scale;
     this.losOk=false; this.losT=rand(0,.2);
     this.lastSeen=new THREE.Vector3();
     this.shielded=!!T.shielded;
     this.group=makeOrbMesh(T.tint);
+    this.hitR=(this.group.userData.hitR||1.6)*T.scale;
     this.group.scale.setScalar(T.scale);
     this.group.position.copy(pos);
     worldGroup.add(this.group);
@@ -1275,11 +1304,18 @@ class Orb{
   update(dt){
     if(this.dead)return;
     const T=this.T;
-    // spin rings if procedural
+    // spin rings if procedural / hover-language if manta
     const inner=this.group.userData.inner;
     if(inner&&inner.userData&&inner.userData.rings){
       inner.userData.rings[0].rotation.z+=dt*.8;
       inner.userData.rings[1].rotation.y+=dt*.6;
+    }else if(inner&&orbFromFile){
+      // MRV manta: bank into lateral velocity + idle anti-grav bob
+      const side=tmpV.set(this.facing.z,0,-this.facing.x); // facing × up
+      const bank=clamp(-this.vel.dot(side)*.045,-.5,.5);
+      inner.rotation.z=damp(inner.rotation.z,bank,4,dt);
+      inner.position.y=Math.sin(game.time*1.7+this.home.x*.7)*.28;
+      inner.rotation.x=Math.sin(game.time*1.1+this.home.z)*.04;
     }
     if(this.disabledT>0){
       this.disabledT-=dt;
@@ -1326,7 +1362,7 @@ class Orb{
         target.addScaledVector(side,Math.sin(game.time*1.7+this.home.x)*12);
       }
       // keep standoff
-      if(this.pos.distanceTo(player.pos)<14)target.copy(this.pos).addScaledVector(tmpV.subVectors(this.pos,player.pos).normalize(),6);
+      if(this.pos.distanceTo(player.pos)<10+this.hitR*2)target.copy(this.pos).addScaledVector(tmpV.subVectors(this.pos,player.pos).normalize(),6);
     }
     if(want&&spd>0){
       const dir=target.sub(this.pos);
@@ -1630,6 +1666,81 @@ function pylonHitCheck(point,dmg){
   return false;
 }
 
+/* ---------------- blacksite structure kit ----------------
+   Reusable top-secret base pieces. Anything that spins registers
+   itself in spinProps (cleared per level, updated in the main loop). */
+const spinProps=[];
+function landingPad(x,z,r=12){
+  const pad=new THREE.Mesh(new THREE.CylinderGeometry(r,r,1.4,28),MAT.floor);
+  pad.position.set(x,.7,z); pad.receiveShadow=true; worldGroup.add(pad); addCollider(pad);
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(r*.86,.22,8,40),MAT.amberStrip);
+  ring.rotation.x=Math.PI/2; ring.position.set(x,1.5,z); worldGroup.add(ring);
+  const h=new THREE.Mesh(new THREE.TorusGeometry(r*.3,.16,8,26),MAT.cyanStrip);
+  h.rotation.x=Math.PI/2; h.position.set(x,1.52,z); worldGroup.add(h);
+  return pad;
+}
+function commDome(x,z,r=10){
+  const dome=new THREE.Mesh(new THREE.SphereGeometry(r,22,14,0,TWO_PI,0,Math.PI/2),MAT.wall);
+  dome.position.set(x,0,z); dome.castShadow=Q.shadows; worldGroup.add(dome); addCollider(dome);
+  box(r*.24,r*1.7,r*.24,MAT.wall,x,r*1.7*.5,z,false);
+  const bcn=box(r*.3,.5,r*.3,MAT.amberStrip,x,r*1.75,z,false);
+  spinProps.push({m:bcn,ax:'y',sp:2.4});
+  return dome;
+}
+function radarDish(x,z){
+  box(2.4,9,2.4,MAT.wall,x,4.5,z);
+  const pivot=new THREE.Group(); pivot.position.set(x,10,z); worldGroup.add(pivot);
+  const dish=new THREE.Mesh(new THREE.SphereGeometry(5.5,20,10,0,TWO_PI,0,Math.PI/3.2),
+    new THREE.MeshStandardMaterial({color:0x1a2026,metalness:.9,roughness:.4,side:THREE.DoubleSide}));
+  dish.rotation.x=Math.PI/2.4; dish.position.z=1.4; pivot.add(dish);
+  const feed=new THREE.Mesh(new THREE.CylinderGeometry(.12,.12,4.2,8),MAT.cyanStrip);
+  feed.rotation.x=Math.PI/2.4; feed.position.z=3.2; feed.position.y=1.4; pivot.add(feed);
+  spinProps.push({m:pivot,ax:'y',sp:.5});
+  return pivot;
+}
+function antennaMast(x,z,h=30){
+  box(1.2,h,1.2,MAT.wall,x,h/2,z);
+  box(.4,6,.4,MAT.amberStrip,x,h+3,z,false);
+  box(5,.4,.4,MAT.cyanStrip,x,h*.8,z,false);
+}
+function cargoStack(x,z,n=3){
+  for(let i=0;i<n;i++)
+    box(rand(4,6),3,rand(4,6),i%2?MAT.wall:MAT.wallLit,x+rand(-2,2),1.5+i*3,z+rand(-2,2));
+}
+/* the hangar itself — south face carries an open bay the Sentinel flies INTO.
+   doorW/doorH define the aperture; walls, lintel, roof and columns all collide. */
+function blacksiteHangar(cx,cz,W=120,D=100,H=30,doorW=30,doorH=16){
+  const zS=cz+D/2, zN=cz-D/2;
+  const segW=(W-doorW)/2;
+  // south face: two shoulders + lintel over the bay
+  box(segW,H,4,MAT.wall,cx-(doorW/2+segW/2),H/2,zS);
+  box(segW,H,4,MAT.wall,cx+(doorW/2+segW/2),H/2,zS);
+  box(doorW,H-doorH,4,MAT.wall,cx,doorH+(H-doorH)/2,zS);
+  // bay frame glow — reads as "fly in HERE"
+  box(doorW+2,1,4.6,MAT.amberStrip,cx,doorH+.6,zS,false);
+  box(1,doorH,4.6,MAT.amberStrip,cx-doorW/2-.6,doorH/2,zS,false);
+  box(1,doorH,4.6,MAT.amberStrip,cx+doorW/2+.6,doorH/2,zS,false);
+  // shell
+  box(W,H,4,MAT.wall,cx,H/2,zN);                 // north
+  box(4,H,D,MAT.wall,cx-W/2,H/2,cz);             // west
+  box(4,H,D,MAT.wall,cx+W/2,H/2,cz);             // east
+  box(W+8,4,D+8,MAT.wall,cx,H+2,cz);             // roof
+  box(6,3,6,MAT.amberStrip,cx-W/2+8,H+5.5,cz-D/2+8,false); // roof beacons
+  box(6,3,6,MAT.cyanStrip,cx+W/2-8,H+5.5,cz+D/2-8,false);
+  // interior columns + strip lighting
+  for(const px of [-W*.28,W*.28])for(const pz of [-D*.25,D*.25]){
+    box(4,H,4,MAT.wall,cx+px,H/2,cz+pz);
+    box(4.4,1.2,4.4,MAT.cyanStrip,cx+px,H*.35,cz+pz,false);
+  }
+  for(let z=zN+14;z<zS-10;z+=16)
+    box(W*.7,.5,1.2,((z-zN)%32<16)?MAT.cyanStrip:MAT.amberStrip,cx,H-1.4,z,false);
+  // approach guide-lights on the tarmac leading into the bay
+  for(let z=zS+8;z<zS+70;z+=12){
+    box(1.4,.4,3,MAT.amberStrip,cx-doorW*.32,.3,z,false);
+    box(1.4,.4,3,MAT.amberStrip,cx+doorW*.32,.3,z,false);
+  }
+}
+
 /* ---------------- levels ---------------- */
 function makeLights(hemiC=0x1a2b33,hemiG=0x05070a,hemiI=.7){
   const hemi=new THREE.HemisphereLight(hemiC,hemiG,hemiI); worldGroup.add(hemi);
@@ -1645,7 +1756,7 @@ function makeLights(hemiC=0x1a2b33,hemiG=0x05070a,hemiI=.7){
 const LEVELS=[
 { // ============ L1 PERIMETER BREACH ============
   name:'PERIMETER BREACH', num:'01',
-  brief:`SITE NADIR — SURFACE APPROACH · 0230 LOCAL\n\nStorm cell overhead. Their thermals are blind; their optics are not.\nTwo relay pylons feed the perimeter grid its eyes. Cut them, and the\nouter gate vents open for ninety seconds of confusion.\n\nStay low. Stay dark. The searchlights do not forgive.`,
+  brief:`SITE NADIR — SURFACE APPROACH · 0230 LOCAL\n\nStorm cell overhead. Their thermals are blind; their optics are not.\nBeyond the wall sits a blacksite hangar that does not exist on any\nmap — and beneath it, the shaft down to the gravity-well reactor.\n\nTwo relay pylons feed the perimeter grid its eyes. Cut them, and the\nouter gate vents open for ninety seconds of confusion.\n\nStay low. Stay dark. The searchlights do not forgive. And Sentinel —\nthe grid has new teeth: MRV-class "MANTA" interceptors. They are\nbigger than you. Do not let them prove it.`,
   objectives:[
     {id:'p1',label:'Destroy relay pylon ALPHA'},
     {id:'p2',label:'Destroy relay pylon BRAVO'},
@@ -1680,6 +1791,18 @@ const LEVELS=[
     box(140,22,4,MAT.wall,-46,11,-150); box(140,22,4,MAT.wall,46,11,-150);
     box(10,4,4,MAT.wallLit,0,20,-150,true);
     box(24,1.2,4,MAT.amberStrip,0,22.6,-150,false);
+    // the blacksite, glimpsed beyond the gate — unreachable this mission
+    box(96,26,60,MAT.wall,0,13,-215,false);
+    box(30,10,4,MAT.wall,0,5,-184,false);
+    box(32,1,4.6,MAT.amberStrip,0,10.6,-184,false); // sealed bay glow
+    antennaMast(-60,-200,34); antennaMast(58,-206,28);
+    const dome1=new THREE.Mesh(new THREE.SphereGeometry(12,20,12,0,TWO_PI,0,Math.PI/2),MAT.wall);
+    dome1.position.set(84,0,-198); worldGroup.add(dome1);
+    box(3,.6,3,MAT.cyanStrip,84,12.6,-198,false);
+    // forward bunkers inside the perimeter field
+    box(14,6,10,MAT.wall,-96,3,20); box(15,1,11,MAT.cyanStrip,-96,6.6,20,false);
+    box(12,5,9,MAT.wall,104,2.5,-16); box(13,1,10,MAT.amberStrip,104,5.6,-16,false);
+    cargoStack(-88,34,2); cargoStack(96,-2,3);
     // searchlight towers
     searchTower(-42,-70,26,1.2,.42,0);
     searchTower(46,-96,30,1.0,.35,2.1);
@@ -1710,9 +1833,70 @@ const LEVELS=[
     }else this.exitBeacon.visible=false;
   }
 },
-{ // ============ L2 THE SHAFT ============
-  name:'THE SHAFT', num:'02',
-  brief:`VENTILATION SHAFT NADIR-V · DEPTH 240 METERS\n\nThe only way in is straight down — a maintenance shaft laced with\nsecurity grates and laser tripwires. The grates leave gaps a\nconventional airframe could never thread.\n\nYou are not a conventional airframe. Kill the anti-grav and fall.\nA Warden holds the airlock at the bottom. It does not move. It does\nnot sleep.`,
+{ // ============ L2 BLACKSITE HANGAR ============
+  name:'BLACKSITE HANGAR', num:'02',
+  brief:`FACILITY NADIR-H — RESTRICTED AIRSPACE · 0300 LOCAL\n\nThe hangar in front of you does not exist. No records, no manifest,\nno one who has seen inside it and talked about it afterwards.\n\nThe bay doors are open for MANTA rotation cycles. Thread the bay,\nget inside, and rip the hangar mainframe — it holds the location of\nthe ventilation shaft that drops to the reactor. A shielded Warden\nsits on the mainframe. The intake it unlocks is in the northeast\ncorner of the floor.\n\nYou will be indoors, Sentinel. There is nowhere to run in a box.`,
+  objectives:[
+    {id:'infil',label:'Infiltrate the hangar through the bay doors'},
+    {id:'core',label:'Extract the hangar mainframe'},
+    {id:'exit',label:'Dock at the ventilation shaft intake'},
+  ],
+  build(){
+    scene.background=new THREE.Color(0x040609);
+    scene.fog=new THREE.FogExp2(0x040609,.0095);
+    makeLights(0x203442,0x04060a,.8);
+    this.bounds=new THREE.Box3(new THREE.Vector3(-170,1,-170),new THREE.Vector3(170,58,170));
+    this.floorY=0; this.killY=-20;
+    floorPlane(400,MAT.floor,0,true);
+    // ============ the top-secret base ============
+    blacksiteHangar(0,-60,120,100,30,30,16); // fly-in bay faces the spawn
+    // hangar interior — parked MRV silhouettes, cargo, gantry
+    box(16,4,20,MAT.wall,-34,2,-84); box(17,.8,21,MAT.cyanStrip,-34,4.5,-84,false);
+    box(16,4,20,MAT.wall,34,2,-84);  box(17,.8,21,MAT.amberStrip,34,4.5,-84,false);
+    cargoStack(-40,-34,3); cargoStack(42,-40,2); cargoStack(-16,-96,2);
+    box(70,2,3,MAT.wall,0,22,-60); // overhead gantry beam
+    // hangar mainframe + its Warden
+    hackCore(new THREE.Vector3(0,6,-92),'HANGAR MAINFRAME');
+    // ventilation shaft intake — NE corner of the hangar floor
+    const intake=new THREE.Mesh(new THREE.CylinderGeometry(5,5,.6,26),
+      new THREE.MeshStandardMaterial({color:0x05070a,metalness:.9,roughness:.3,emissive:0x0d1f22,emissiveIntensity:.6}));
+    intake.position.set(44,.35,-96); worldGroup.add(intake);
+    const iRing=new THREE.Mesh(new THREE.TorusGeometry(5.4,.22,8,36),MAT.cyanStrip);
+    iRing.rotation.x=Math.PI/2; iRing.position.set(44,.8,-96); worldGroup.add(iRing);
+    // ============ exterior compound ============
+    landingPad(-92,44,13); landingPad(94,38,13);
+    commDome(114,-46,10); radarDish(-116,-52);
+    antennaMast(-70,-118,32); antennaMast(74,-122,26);
+    box(14,6,10,MAT.wall,-100,3,-10); box(15,1,11,MAT.cyanStrip,-100,6.6,-10,false);
+    cargoStack(-70,60,2); cargoStack(80,70,3); cargoStack(112,10,2);
+    // compound fence with a south gap on the approach lane
+    box(120,8,3,MAT.wall,-88,4,110); box(120,8,3,MAT.wall,88,4,110);
+    box(58,1,3.4,MAT.amberStrip,-88,8.6,110,false); box(58,1,3.4,MAT.amberStrip,88,8.6,110,false);
+    // guard towers flanking the bay
+    searchTower(-52,6,28,1.1,.4,0);
+    searchTower(54,2,28,1.1,.38,2.4);
+    this.exitBeacon=objectiveBeacon(new THREE.Vector3(44,2,-96),0x4fd1c5);
+    this.playerStart=new THREE.Vector3(0,9,146);
+    this.spawnOrbs=[
+      ['WATCHER',new THREE.Vector3(-80,12,60),[new THREE.Vector3(-80,12,60),new THREE.Vector3(-110,14,-30),new THREE.Vector3(-40,12,-120)]],
+      ['WATCHER',new THREE.Vector3(84,12,50),[new THREE.Vector3(84,12,50),new THREE.Vector3(110,14,-40),new THREE.Vector3(40,12,-118)]],
+      ['WATCHER',new THREE.Vector3(0,14,40),[new THREE.Vector3(0,14,40),new THREE.Vector3(-60,16,20),new THREE.Vector3(60,16,20)]],
+      ['HUNTER',new THREE.Vector3(0,18,-130),[new THREE.Vector3(0,18,-130),new THREE.Vector3(-90,16,90)]],
+      ['WATCHER',new THREE.Vector3(-30,12,-40),[new THREE.Vector3(-30,12,-40),new THREE.Vector3(30,10,-40),new THREE.Vector3(30,12,-90),new THREE.Vector3(-30,10,-90)]],
+      ['HUNTER',new THREE.Vector3(20,16,-60)],
+      ['WARDEN',new THREE.Vector3(0,8,-84)],
+    ];
+  },
+  check(){
+    if(Math.abs(player.pos.x)<56&&player.pos.z>-106&&player.pos.z<-14&&player.pos.y<28)markDone('infil');
+    if(hackZones[0]&&hackZones[0].done)markDone('core');
+    this.exitBeacon.visible=isDone('core');
+    if(isDone('infil')&&isDone('core')&&player.pos.distanceTo(new THREE.Vector3(44,4,-96))<8)markDone('exit');
+  }
+},
+{ // ============ L3 THE SHAFT ============
+  name:'THE SHAFT', num:'03',
+  brief:`VENTILATION SHAFT NADIR-V · DEPTH 240 METERS\n\nThe intake you uncorked in the hangar drops two hundred and forty\nmeters, straight down — a maintenance shaft laced with\nsecurity grates and laser tripwires. The grates leave gaps a\nconventional airframe could never thread.\n\nYou are not a conventional airframe. Kill the anti-grav and fall.\nA Warden holds the airlock at the bottom. It does not move. It does\nnot sleep.`,
   objectives:[
     {id:'desc',label:'Descend to the airlock (-220m)'},
     {id:'warden',label:'Neutralize the airlock Warden'},
@@ -1776,8 +1960,8 @@ const LEVELS=[
     if(isDone('desc')&&isDone('warden')&&player.pos.distanceTo(new THREE.Vector3(0,-226,0))<8)markDone('exit');
   }
 },
-{ // ============ L3 REACTOR GALLERY ============
-  name:'REACTOR GALLERY', num:'03',
+{ // ============ L4 REACTOR GALLERY ============
+  name:'REACTOR GALLERY', num:'04',
   brief:`GRAVITY-WELL REACTOR HALL · DEPTH 240M\n\nThree data cores hold the reactor governors' keys. Each core is\nwatched by a shielded Warden — EMP the shield, then hold position\ninside the extraction halo until the transfer completes.\n\nA Hive nests in the gallery's heart. Wake the grid, and it will\nnot stop making Hunters until you burn it out.`,
   objectives:[
     {id:'c1',label:'Extract data core K-1'},
@@ -1836,8 +2020,8 @@ const LEVELS=[
     if(all&&player.pos.distanceTo(new THREE.Vector3(100,8,100))<9)markDone('exit');
   }
 },
-{ // ============ L4 EXFILTRATION ============
-  name:'EXFILTRATION', num:'04',
+{ // ============ L5 EXFILTRATION ============
+  name:'EXFILTRATION', num:'05',
   brief:`BLACKOUT PROTOCOL — TERMINAL PHASE · T-MINUS 180 SECONDS\n\nThe governors are burning out. Site NADIR is sealing itself: every\nbulkhead on the egress corridor is timed to slam shut, and the grid\nhas gone to permanent LOCKDOWN. Every ORB knows where you are.\n\nThere is no stealth left. There is only speed. SURGE, Sentinel —\nand do not be inside when the mountain closes.`,
   objectives:[
     {id:'exit',label:'Reach the surface breach before T-0'},
@@ -2128,7 +2312,7 @@ function loadLevel(i){
   clearWorld();
   orbs.length=0; bolts.forEach(b=>fxGroup.remove(b.mesh)); bolts.length=0;
   beams.length=0; pulseFX.length=0; searchlights.length=0; tripwires.length=0;
-  doors.length=0; hackZones.length=0; pylons.length=0;
+  doors.length=0; hackZones.length=0; pylons.length=0; spinProps.length=0;
   if(rain){ scene.remove(rain.points); rain=null; }
   $('missionTimer').style.display='none';
   awareness.value=0;
@@ -2229,6 +2413,7 @@ function tick(){
     updateSearchlights(dt);
     updateTripwires(dt);
     updateHacks(dt);
+    for(const s of spinProps)s.m.rotation[s.ax]+=s.sp*dt;
     awareness.update(dt);
     sparks.update(dt); trail.update(dt);
     if(rain){
